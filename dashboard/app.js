@@ -1,4 +1,4 @@
-// Token Radar dashboard (model radar-2). Reads window.RADAR — written beside
+// Token Radar dashboard (model radar-3). Reads window.RADAR — written beside
 // dashboard/ by main.ts as data.js — and renders the ranked board, filters,
 // sorting, a per-protocol detail dialog and the live-token view.
 // No network: every figure shown comes from the bundled snapshot data.
@@ -28,6 +28,25 @@
   var MAT_RANGE = typeof model.maturity_range === 'number' ? model.maturity_range : 0.4;
   var MAT_DAYS = typeof model.maturity_days === 'number' ? model.maturity_days : 1095;
   var UNKNOWN_AGE = typeof model.unknown_age_days === 'number' ? model.unknown_age_days : 365;
+  var SHARE_FLOOR = typeof model.share_floor === 'number' ? model.share_floor : 0.9;
+  var SHARE_RANGE = typeof model.share_range === 'number' ? model.share_range : 0.2;
+  var CAT_FLOOR = typeof model.category_floor === 'number' ? model.category_floor : 0.95;
+  var CAT_RANGE = typeof model.category_range === 'number' ? model.category_range : 0.1;
+
+  /* Category totals over the board rows (the rankable set), the same
+     denominators the model uses: the stored multipliers in data.js are
+     rounded to 4 decimals, so recomputing from them would drift a few
+     dollars off the board figure. Recomputing from the rows keeps the
+     detail dialog's "matches the board figure" check exact. */
+  var catStats = {};
+  DATA.rows.forEach(function (r) {
+    if (!r.category) return;
+    var s = catStats[r.category] || (catStats[r.category] = { tvl: 0, count: 0 });
+    s.tvl += r.tvl_usd;
+    s.count += 1;
+  });
+  var maxCatTvl = 0;
+  Object.keys(catStats).forEach(function (k) { if (catStats[k].tvl > maxCatTvl) maxCatTvl = catStats[k].tvl; });
 
   var state = { q: '', category: 'all', chain: 'all', tab: 'pre-token', sort: 'rank', dir: 1, detail: null };
 
@@ -49,6 +68,10 @@
   function fmtPct(n) {
     if (n === null || n === undefined || !isFinite(n)) return 'n/a';
     return (n > 0 ? '+' : '') + n.toFixed(2) + '%';
+  }
+  function fmtShare(n) {
+    if (n === null || n === undefined || !isFinite(n)) return 'n/a';
+    return (n * 100).toFixed(2) + '%';
   }
   function fmtAge(days) {
     if (days === null || days === undefined) return 'unknown';
@@ -72,16 +95,31 @@
     return 1 + 0.03 * extra;
   }
   function categoryMultOf(row) {
-    return typeof row.category_multiplier === 'number' ? row.category_multiplier : 1;
+    if (!row.category) return 1;
+    var stat = catStats[row.category];
+    if (!stat || maxCatTvl <= 0) return 1;
+    return CAT_FLOOR + CAT_RANGE * (stat.tvl / maxCatTvl);
+  }
+  function shareMultOf(row) {
+    // Same formula as the model: the row's share of its category's
+    // rankable TVL, 1.0 when the category is unknown or holds only one
+    // rankable protocol. Computed from the board rows, not from the
+    // stored (rounded) share_multiplier, so impliedOf() stays exact.
+    if (!row.category) return 1;
+    var stat = catStats[row.category];
+    if (!stat || stat.tvl <= 0) return 1;
+    if (stat.count <= 1) return 1;
+    return SHARE_FLOOR + SHARE_RANGE * (row.tvl_usd / stat.tvl);
   }
   function impliedOf(row) {
     var base = row.tvl_usd * BASE;
-    var v = base * growthMultOf(row) * maturityMultOf(row) * chainMultOf(row) * categoryMultOf(row);
+    var v = base * growthMultOf(row) * maturityMultOf(row) * chainMultOf(row) * categoryMultOf(row) * shareMultOf(row);
     return Math.max(1, Math.round(v));
   }
   function multLine(row) {
     return 'g ' + fmtMult(growthMultOf(row)) + ' · m ' + fmtMult(maturityMultOf(row)) +
-      ' · ch ' + fmtMult(chainMultOf(row)) + ' · cat ' + fmtMult(categoryMultOf(row));
+      ' · ch ' + fmtMult(chainMultOf(row)) + ' · cat ' + fmtMult(categoryMultOf(row)) +
+      ' · sh ' + fmtMult(shareMultOf(row));
   }
 
   /* ---------- small DOM helper (text only, no HTML injection) ---------- */
@@ -128,8 +166,8 @@
   function fillStats() {
     $('asOf').textContent = DATA.as_of || '2026-11-14';
     $('sourceName').textContent = DATA.source || 'DefiLlama';
-    $('modelVer').textContent = DATA.model_version || 'radar-2';
-    $('footModel').textContent = DATA.model_version || 'radar-2';
+    $('modelVer').textContent = DATA.model_version || 'radar-3';
+    $('footModel').textContent = DATA.model_version || 'radar-3';
     $('statWatchlist').textContent = (DATA.watchlist_size || 0) + ' / ' + (DATA.watchlist_size || 0);
     $('statBoard').textContent = String(DATA.board_size || DATA.rows.length);
     $('statEarly').textContent = String(DATA.early_size || 0);
@@ -400,6 +438,8 @@
       eq.appendChild(eqRow('Maturity multiplier', fmtMult(maturityMultOf(row))));
       eq.appendChild(eqRow('Chains (' + (row.chains || []).length + ')', fmtMult(chainMultOf(row))));
       eq.appendChild(eqRow('Category multiplier', fmtMult(categoryMultOf(row))));
+      eq.appendChild(eqRow('Category share', fmtShare(row.category_share)));
+      eq.appendChild(eqRow('Share multiplier (' + SHARE_FLOOR.toFixed(2) + ' + ' + SHARE_RANGE.toFixed(2) + ' × share)', fmtMult(shareMultOf(row))));
       var total = el('div', 'total');
       total.appendChild(el('span', null, 'Implied value (board)'));
       total.appendChild(el('b', 'num', fmtUsd(row.implied_value_usd)));

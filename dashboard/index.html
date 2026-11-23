@@ -22,7 +22,7 @@
     <div class="top-meta">
       <span>Snapshot <b id="asOf">2026-11-14</b></span>
       <span>Source: <b id="sourceName">DefiLlama</b></span>
-      <span>Model <b id="modelVer">radar-2</b></span>
+      <span>Model <b id="modelVer">radar-3</b></span>
     </div>
   </header>
 
@@ -31,7 +31,7 @@
       <h1 id="pageTitle">Which pre-token protocol would be worth the most — if it launched a token today?</h1>
       <p class="lede-text">Every protocol below <strong>records no token</strong> in the snapshot. The board ranks them by
         <strong>implied value</strong>: a model estimate built only from the protocol&rsquo;s own snapshot figures
-        (TVL, 7-day growth, age, chains, category). It is not a price, not a prediction that a token will
+        (TVL, 7-day growth, age, chains, category, category share). It is not a price, not a prediction that a token will
         launch, and not investment advice. Select any row for its full model breakdown and farm plan.</p>
       <p class="lede-note">The watchlist is the floor, not the ceiling: protocols with at least $50M TVL and no token
         on record start the board, and the radar adds pre-token protocols below that floor — the early
@@ -96,7 +96,8 @@
       <p><code>growthMult = 1 + clamp(change_7d, −60, +120) / 100 × 0.5</code></p>
       <p><code>maturityMult = 0.6 + min(max(age_days, 0), 1095) / 1095 × 0.4</code></p>
       <p><code>chainMult = 1 + 0.03 × min(max(chains − 1, 0), 4)</code></p>
-      <p><code>implied = max(1, round(base × growthMult × maturityMult × chainMult × categoryMult))</code></p>
+      <p><code>shareMult = 0.90 + 0.20 × categoryShare</code></p>
+      <p><code>implied = max(1, round(base × growthMult × maturityMult × chainMult × categoryMult × shareMult))</code></p>
     </div>
     <ul class="constants">
       <li><b>Base 0.25</b> — a protocol is first valued at a quarter of its TVL.</li>
@@ -104,6 +105,7 @@
       <li><b>Maturity</b> — age since first listing (0–3 years) scales 0.6 → 1.0; unknown age counts as 365 days.</li>
       <li><b>Chains</b> — each extra chain beyond the first adds 3%, up to 4 extra chains.</li>
       <li><b>Category</b> — a category multiplier carried in the data; it never depends on a protocol name.</li>
+      <li><b>Category share</b> — the protocol&rsquo;s share of its category&rsquo;s rankable pre-token TVL. The share multiplier runs 0.90 (no share) to 1.10 (the whole category), and stays 1.0 when the category is unknown or holds only one rankable protocol.</li>
     </ul>
     <p class="model-note"><strong>What implied value is:</strong> the value a token <em>would</em> carry if the protocol&rsquo;s
       track record held as it stands — the entry&rsquo;s own claim, not a market price. <strong>What it is not:</strong>
@@ -116,7 +118,7 @@
   </section>
 
   <footer class="foot">
-    <p>Token Radar — model <span id="footModel">radar-2</span>. Implied values are model estimates from a frozen
+    <p>Token Radar — model <span id="footModel">radar-3</span>. Implied values are model estimates from a frozen
       snapshot, not prices and not investment advice. Farm plans are generic actions derived from each
       protocol&rsquo;s category, chains, TVL and age; always verify costs and the protocol&rsquo;s own pages before acting.</p>
   </footer>
